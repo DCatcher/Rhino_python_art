@@ -10,6 +10,7 @@ sfBaseSurface = None
 reRadius = 5 #the length of the equal side
 reBase = 5 #the length of the bottom side
 reDist = 0.05
+intMaxX = 0
 ltObjectPoint = []
 
 def InOrOut(ptcordTmpPointInter): #to judge whether I have added this point
@@ -20,6 +21,7 @@ def InOrOut(ptcordTmpPointInter): #to judge whether I have added this point
 	return 0
 
 def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpCordNum, intWhich): #to add the point into the dict
+	global intMaxX
 	ltTmpCordNumInter = [ltTmpCordNum[0],ltTmpCordNum[1]]
 	if ptcordTmpPointInter[intWhich]<ptcordTmpPoint[intWhich]:
 		ltTmpCordNumInter[intWhich] -= 1
@@ -27,6 +29,8 @@ def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpCordNum, intWhich): #to a
 			ltTmpCordNumInter[0] += 1
 	else:
 		ltTmpCordNumInter[intWhich] += 1
+	if ltTmpCordNumInter[0]>intMaxX:
+		intMaxX = ltTmpCordNumInter[0]
 	if ((ltTmpCordNumInter[0] % 5 == 0)):
 		rs.AddTextDot(str(ltTmpCordNumInter[0])+","+str(ltTmpCordNumInter[1]),ptcordTmpPointInter)
 	dictPointByCord[ptcordTmpPointInter] = ltTmpCordNumInter
@@ -114,11 +118,23 @@ def expand(intStartY): #this function expands the points in the Y direction
 	global reBase
 	global reDist
 	global ltObjectPoint
-	ltStartXY = (0,intStartY) #this is the point we start
-	if ltStartXY not in dictPointByNum:
-		return 0
+	global intMaxX
 	quePoint = Queue.Queue(maxsize=0) #get point from the queue until it is empty
-	quePoint.put(dictPointByNum[ltStartXY])
+	boolExPoint = 0
+	for intX in range(intMaxX+1):
+		ltStartXY = (intX,intStartY) #this is the point we start
+		if ltStartXY in dictPointByNum:
+			quePoint.put(dictPointByNum[ltStartXY])
+			boolExPoint = 1
+		if intX==0:
+			continue
+		ltStartXY = (-intX,intStartY)
+		if ltStartXY in dictPointByNum:
+			quePoint.put(dictPointByNum[ltStartXY])
+			boolExPoint = 1
+
+	if boolExPoint==0:
+		return 1
 	ltNeAndPo = (-1,1)
 
 	while quePoint.qsize()>0:
@@ -143,13 +159,11 @@ def expand(intStartY): #this function expands the points in the Y direction
 			ltTmpIntersection = rs.CurveSurfaceIntersection( cvInterCircle, sfBaseSurface) #get new points
 			if ltTmpIntersection is None:
 				continue
-			boolAdd = 0
 			for ltIntersectionPoint in ltTmpIntersection: #Add the points
 				if ltIntersectionPoint[0]==1:
 					ptcordTmpPointInter = ltIntersectionPoint[1]
 					boolInOrNot = InOrOut(ptcordTmpPointInter)
 					if boolInOrNot == 0:
-						boolAdd = 1
 						if intNeOrPo<0:
 							AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNearNum, 1)
 						else:
@@ -157,8 +171,6 @@ def expand(intStartY): #this function expands the points in the Y direction
 				else:
 					print "Impossible"
 					return -1
-			if boolAdd>0:
-				quePoint.put(ptcordTmpPointNear)
 			rs.DeleteObject(cvInterCircle)
 		'''
 		for intNeOrPoHigh in ltNeAndPo:
@@ -196,16 +208,16 @@ def main():
 				return
 		else:
 			intEx = 0
-			if (0,intNowY) in dictPointByNum:
-				intEx = 1
-				intExpandReturn = expand(intNowY)
-				if intExpandReturn is not 0:
-					return
-			if (0,-intNowY) in dictPointByNum:
-				intEx = 1
-				intExpandReturn = expand(-intNowY)
-				if intExpandReturn is not 0:
-					return
+			intExpandReturn = expand(intNowY)
+			if intExpandReturn is not 0:
+				return
+			if intExpandReturn is not 1:
+				intEx = 1	
+			intExpandReturn = expand(-intNowY)
+			if intExpandReturn is not 0:
+				return
+			if intExpandReturn is not 1:
+				intEx = 1	
 			if intEx == 0:
 				break
 		intNowY += 1
