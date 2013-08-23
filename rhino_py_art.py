@@ -13,26 +13,35 @@ reDist = 0.05
 intMaxX = 0
 ltObjectPoint = []
 
-def InOrOut(ptcordTmpPointInter): #to judge whether I have added this point
+def InOrOut(ptcordTmpPointInter, intMaxDist=0): #to judge whether I have added this point
 	for ptcordPointTmpInOrOut in dictPointByCord:
 		reDistForCompare = rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPointInter)
-		if reDistForCompare < reDist:
+		if reDistForCompare < reDist+intMaxDist*reRadius:
 			return 1
 	return 0
 
 def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpCordNum, intWhich): #to add the point into the dict
 	global intMaxX
 	ltTmpCordNumInter = [ltTmpCordNum[0],ltTmpCordNum[1]]
-	if ptcordTmpPointInter[intWhich]<ptcordTmpPoint[intWhich]:
-		ltTmpCordNumInter[intWhich] -= 1
-		if intWhich==1:
-			ltTmpCordNumInter[0] += 1
-	else:
-		ltTmpCordNumInter[intWhich] += 1
+	if intWhich<2:
+		if ptcordTmpPointInter[intWhich]<ptcordTmpPoint[intWhich]:
+			ltTmpCordNumInter[intWhich] -= 1
+			if intWhich==1:
+				ltTmpCordNumInter[0] += 1
+		else:
+			ltTmpCordNumInter[intWhich] += 1
+	elif intWhich==2:
+		ltTmpCordNumInter[0]-=1
+	elif intWhich==3:
+		ltTmpCordNumInter[0]+=1
+
 	if ltTmpCordNumInter[0]>intMaxX:
 		intMaxX = ltTmpCordNumInter[0]
+	if -ltTmpCordNumInter[0]>intMaxX:
+		intMaxX = -ltTmpCordNumInter[0]
 	if ((ltTmpCordNumInter[0] % 5 == 0)):
 		rs.AddTextDot(str(ltTmpCordNumInter[0])+","+str(ltTmpCordNumInter[1]),ptcordTmpPointInter)
+#	rs.AddTextDot(str(ltTmpCordNumInter[0])+","+str(ltTmpCordNumInter[1]),ptcordTmpPointInter)
 	dictPointByCord[ptcordTmpPointInter] = ltTmpCordNumInter
 	dictPointByNum[tuple(ltTmpCordNumInter)] = ptcordTmpPointInter
 	ptTmpPoint = rs.AddPoint(ptcordTmpPointInter)
@@ -58,19 +67,18 @@ def init():
 	global reDist
 	global ltObjectPoint
 	ptStartPoint = rs.GetObject("Select the point to start", rs.filter.point)
+	cvBaseCurve = rs.GetObject("Select the baseline", rs.filter.curve)
+	sfBaseSurface = rs.GetObject("Select the base surface", rs.filter.surface)
+	if sfBaseSurface is None:
+		print "what the fuck"
+		return -1
 	ptcordStartPoint = rs.PointCoordinates(ptStartPoint)
 	rs.AddTextDot("0,0",ptcordStartPoint)
 	quePoint = Queue.Queue(maxsize=0)
 	quePoint.put(ptcordStartPoint)
 	dictPointByNum[(0,0)] = ptcordStartPoint
 	dictPointByCord[ptcordStartPoint] = (0,0)
-	cvBaseCurve = rs.GetObject("Select the baseline", rs.filter.curve)
-	sfBaseSurface = rs.GetObject("Select the base surface", rs.filter.surface)
-	if sfBaseSurface is None:
-		print "what the fuck"
-		return -1
 	while quePoint.qsize()>0:
-		print quePoint.qsize()#debug output
 		'''
 
 		intContinueResult = continue_or_not()
@@ -121,6 +129,7 @@ def expand(intStartY): #this function expands the points in the Y direction
 	global intMaxX
 	quePoint = Queue.Queue(maxsize=0) #get point from the queue until it is empty
 	boolExPoint = 0
+
 	for intX in range(intMaxX+1):
 		ltStartXY = (intX,intStartY) #this is the point we start
 		if ltStartXY in dictPointByNum:
@@ -136,6 +145,7 @@ def expand(intStartY): #this function expands the points in the Y direction
 	if boolExPoint==0:
 		return 1
 	ltNeAndPo = (-1,1)
+	ltNeAndPoHigh = (-1,1)
 
 	while quePoint.qsize()>0:
 		ptcordTmpPoint = quePoint.get() #this is the point we concern now, we also need the points near it
@@ -155,7 +165,7 @@ def expand(intStartY): #this function expands the points in the Y direction
 			if ltInterResults:
 				cvInterCircle = rs.AddCircle(ltInterResults[1], ltInterResults[2])
 			else:
-				return
+				continue
 			ltTmpIntersection = rs.CurveSurfaceIntersection( cvInterCircle, sfBaseSurface) #get new points
 			if ltTmpIntersection is None:
 				continue
@@ -170,10 +180,10 @@ def expand(intStartY): #this function expands the points in the Y direction
 							AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNum, 1)
 				else:
 					print "Impossible"
-					return -1
+					continue
 			rs.DeleteObject(cvInterCircle)
-		'''
-		for intNeOrPoHigh in ltNeAndPo:
+
+		for intNeOrPoHigh in ltNeAndPoHigh:
 			if (ltTmpPointNum[0]+intNeOrPoHigh,ltTmpPointNum[1]) not in dictPointByNum:
 				for intNeOrPo in ltNeAndPo:
 					if intNeOrPoHigh==1:
@@ -184,17 +194,34 @@ def expand(intStartY): #this function expands the points in the Y direction
 					if ltTmpPointNearNum not in dictPointByNum:
 						continue
 					ptcordTmpPointNear = dictPointByNum[ltTmpPointNearNum] #get the cord of the near point
-					ptcordTmpPointDist = dictPointByNum[(ltTmpPointNum[0]-intNeOrPoHigh,ltTmpPointNum[1])]
-					reDistanceTmp = rs.Distance(ptcordTmpPointDist,ptcordTmpPoint)
 
 					planeXYPlane = rs.WorldXYPlane()
 					planeTmpPlane0 = rs.MovePlane(planeXYPlane, ptcordTmpPoint)
 					planeTmpPlane1 = rs.MovePlane(planeXYPlane, ptcordTmpPointNear)
-					ltInterResults = rs.IntersectSpheres(planeTmpPlane0, reDistanceTmp, planeTmpPlane1, reRadius)
-		'''
+					ltInterResults = rs.IntersectSpheres(planeTmpPlane0, reRadius, planeTmpPlane1, reRadius)
+
+					if ltInterResults:
+						cvInterCircle = rs.AddCircle(ltInterResults[1], ltInterResults[2])
+					else:
+						continue
+					ltTmpIntersection = rs.CurveSurfaceIntersection( cvInterCircle, sfBaseSurface) #get new points
+					if ltTmpIntersection is None:
+						continue
+					for ltIntersectionPoint in ltTmpIntersection: #Add the points
+						if ltIntersectionPoint[0]==1:
+							ptcordTmpPointInter = ltIntersectionPoint[1]
+							boolInOrNot = InOrOut(ptcordTmpPointInter,0.4)
+							if boolInOrNot == 0:
+								if intNeOrPoHigh<0:
+									AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNearNum, 2)
+								else:
+									AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNearNum, 3)
+						else:
+							print "Impossible"
+							continue
+					rs.DeleteObject(cvInterCircle)
 
 	return 0
-
 
 def main():
 	intInitReturn = init()
@@ -204,18 +231,12 @@ def main():
 	while 1:
 		if intNowY ==0:
 			intExpandReturn = expand(0)
-			if intExpandReturn is not 0:
-				return
 		else:
 			intEx = 0
 			intExpandReturn = expand(intNowY)
-			if intExpandReturn is not 0:
-				return
 			if intExpandReturn is not 1:
 				intEx = 1	
 			intExpandReturn = expand(-intNowY)
-			if intExpandReturn is not 0:
-				return
 			if intExpandReturn is not 1:
 				intEx = 1	
 			if intEx == 0:
