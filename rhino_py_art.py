@@ -1,27 +1,60 @@
+#zcx writes it
+#2013/8/24
 import rhinoscriptsyntax as rs
 import Rhino
 import math
 import Queue
 
+strPathExamine = "order.txt"
+strPathOut = "result.txt"
+fileTmp0 = open(strPathExamine,'w')
+fileTmp1 = open(strPathOut,'w')
+fileTmp0.close()
+fileTmp1.close()
 dictPointByNum = {} #all the points,(0,0) is the start point
 dictPointByCord = {}
+dictPointByCordGetRs = {}
 cvBaseCurve = None
 sfBaseSurface = None
+reRadius = 1500 #the length of the equal side
+reBase = 1000 #the length of the bottom side
+reDist = 700
+'''
 reRadius = 5 #the length of the equal side
 reBase = 5 #the length of the bottom side
-reDist = 0.05
+reDist = 0.5
+'''
 intMaxX = 0
+intMaxY = 0
+intPointNum = 0
 ltObjectPoint = []
+intTestNum =20
+intInterval = 20
 
-def InOrOut(ptcordTmpPointInter, intMaxDist=0): #to judge whether I have added this point
-	for ptcordPointTmpInOrOut in dictPointByCord:
-		reDistForCompare = rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPointInter)
-		if reDistForCompare < reDist+intMaxDist*reRadius:
-			return 1
+def InOrOut(ptcordTmpPointInter, ltTmpPointCord, intMaxDist=0): #to judge whether I have added this point
+	ltDeltaX = range(-intTestNum,intTestNum+1)
+	ltDeltaY = range(-intTestNum,intTestNum+1)
+	for intDeltaX in ltDeltaX:
+		for intDeltaY in ltDeltaY:
+			ltTmpPointCordNear = (ltTmpPointCord[0]+intDeltaX, ltTmpPointCord[1]+intDeltaY)
+			if ltTmpPointCordNear not in dictPointByNum:
+				continue
+			ptcordPointTmpInOrOut = dictPointByNum[ltTmpPointCordNear]
+			reDistForCompare = rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPointInter)
+			if reDistForCompare < reDist+intMaxDist*reBase:
+				return 1
 	return 0
 
-def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpCordNum, intWhich): #to add the point into the dict
+def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ptcordThirdPoint, ltTmpCordNum, intWhich): #to add the point into the dict
 	global intMaxX
+	global intMaxY
+	global sfBaseSurface
+	global intPointNum
+	ptTmpPoint = rs.AddPoint(ptcordTmpPointInter)
+	ltObjectPoint.append(ptTmpPoint)
+	if not rs.IsPointOnSurface(sfBaseSurface,ptTmpPoint):
+		rs.DeleteObject(ptTmpPoint)
+		return
 	ltTmpCordNumInter = [ltTmpCordNum[0],ltTmpCordNum[1]]
 	if intWhich<2:
 		if ptcordTmpPointInter[intWhich]<ptcordTmpPoint[intWhich]:
@@ -35,18 +68,33 @@ def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpCordNum, intWhich): #to a
 	elif intWhich==3:
 		ltTmpCordNumInter[0]+=1
 
+	if ltTmpCordNumInter[1]>intMaxY:
+		intMaxY = ltTmpCordNumInter[1]
+	if -ltTmpCordNumInter[1]>intMaxY:
+		intMaxY = -ltTmpCordNumInter[1]
 	if ltTmpCordNumInter[0]>intMaxX:
 		intMaxX = ltTmpCordNumInter[0]
 	if -ltTmpCordNumInter[0]>intMaxX:
 		intMaxX = -ltTmpCordNumInter[0]
-	if ((ltTmpCordNumInter[0] % 5 == 0)):
+	if ((ltTmpCordNumInter[0] % intInterval == 0)):
 		rs.AddTextDot(str(ltTmpCordNumInter[0])+","+str(ltTmpCordNumInter[1]),ptcordTmpPointInter)
 #	rs.AddTextDot(str(ltTmpCordNumInter[0])+","+str(ltTmpCordNumInter[1]),ptcordTmpPointInter)
 	dictPointByCord[ptcordTmpPointInter] = ltTmpCordNumInter
+	dictPointByCordGetRs[ptcordTmpPointInter] = ptTmpPoint
 	dictPointByNum[tuple(ltTmpCordNumInter)] = ptcordTmpPointInter
-	ptTmpPoint = rs.AddPoint(ptcordTmpPointInter)
-	ltObjectPoint.append(ptTmpPoint)
-
+#	if ptcordThirdPoint is not None:
+#		rs.AddSrfPt([ptTmpPoint,dictPointByCordGetRs[ptcordTmpPoint],dictPointByCordGetRs[ptcordThirdPoint]])
+	intPointNum += 1
+	if intPointNum%20==0:
+		fileTmp0 = open(strPathExamine,'r')
+		strOrder = fileTmp0.readline()
+		fileTmp0.close()
+		if strOrder=='exit':
+			exit()
+		fileTmp0 = open(strPathOut,'a')
+		fileTmp0.write(str(intPointNum)+'\n')
+		fileTmp0.close()
+	
 
 def continue_or_not():
 	items = ("Continue", "False", "True")
@@ -78,6 +126,8 @@ def init():
 	quePoint.put(ptcordStartPoint)
 	dictPointByNum[(0,0)] = ptcordStartPoint
 	dictPointByCord[ptcordStartPoint] = (0,0)
+	dictPointByCordGetRs[ptcordStartPoint] = ptStartPoint
+
 	while quePoint.qsize()>0:
 		'''
 
@@ -98,10 +148,10 @@ def init():
 		for ltIntersectionPoint in ltTmpIntersection:
 			if ltIntersectionPoint[0]==1:
 				ptcordTmpPointInter = ltIntersectionPoint[1]
-				boolInOrNot = InOrOut(ptcordTmpPointInter)
+				boolInOrNot = InOrOut(ptcordTmpPointInter, ltTmpCordNum)
 				if boolInOrNot == 0:
 					quePoint.put(ptcordTmpPointInter)
-					AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpCordNum, 0)
+					AddPoint(ptcordTmpPointInter, ptcordTmpPoint, None, ltTmpCordNum, 0)
 			else:
 				print "Impossible"
 				return -1
@@ -149,6 +199,8 @@ def expand(intStartY): #this function expands the points in the Y direction
 
 	while quePoint.qsize()>0:
 		ptcordTmpPoint = quePoint.get() #this is the point we concern now, we also need the points near it
+		if ptcordTmpPoint not in dictPointByCord:
+			continue
 		ltTmpPointNum = dictPointByCord[ptcordTmpPoint]
 
 		for intNeOrPo in ltNeAndPo:
@@ -172,12 +224,12 @@ def expand(intStartY): #this function expands the points in the Y direction
 			for ltIntersectionPoint in ltTmpIntersection: #Add the points
 				if ltIntersectionPoint[0]==1:
 					ptcordTmpPointInter = ltIntersectionPoint[1]
-					boolInOrNot = InOrOut(ptcordTmpPointInter)
+					boolInOrNot = InOrOut(ptcordTmpPointInter, ltTmpPointNearNum)
 					if boolInOrNot == 0:
 						if intNeOrPo<0:
-							AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNearNum, 1)
+							AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNearNum, 1)
 						else:
-							AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNum, 1)
+							AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNum, 1)
 				else:
 					print "Impossible"
 					continue
@@ -205,21 +257,48 @@ def expand(intStartY): #this function expands the points in the Y direction
 					else:
 						continue
 					ltTmpIntersection = rs.CurveSurfaceIntersection( cvInterCircle, sfBaseSurface) #get new points
+					rs.DeleteObject(cvInterCircle)
 					if ltTmpIntersection is None:
 						continue
 					for ltIntersectionPoint in ltTmpIntersection: #Add the points
 						if ltIntersectionPoint[0]==1:
 							ptcordTmpPointInter = ltIntersectionPoint[1]
-							boolInOrNot = InOrOut(ptcordTmpPointInter,0.4)
+							boolInOrNot = InOrOut(ptcordTmpPointInter,ltTmpPointNearNum, 0.6)
 							if boolInOrNot == 0:
 								if intNeOrPoHigh<0:
-									AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNearNum, 2)
+									AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNearNum, 2)
 								else:
-									AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ltTmpPointNearNum, 3)
+									AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNearNum, 3)
+
+								planeXYPlane = rs.WorldXYPlane()
+								planeTmpPlane0 = rs.MovePlane(planeXYPlane, ptcordTmpPoint)
+								planeTmpPlane1 = rs.MovePlane(planeXYPlane, ptcordTmpPointInter)
+								ltInterResults = rs.IntersectSpheres(planeTmpPlane0, reRadius, planeTmpPlane1, reRadius)
+
+								if ltInterResults:
+									cvInterCircle = rs.AddCircle(ltInterResults[1], ltInterResults[2])
+								else:
+									continue
+								ltTmpIntersection = rs.CurveSurfaceIntersection( cvInterCircle, sfBaseSurface) #get new points
+								rs.DeleteObject(cvInterCircle)
+								if ltTmpIntersection is None:
+									continue
+								for ltIntersectionPoint in ltTmpIntersection: #Add the points
+									if ltIntersectionPoint[0]==1:
+										ptcordTmpPointInter = ltIntersectionPoint[1]
+										boolInOrNot = InOrOut(ptcordTmpPointInter, ltTmpPointNum, 0.6)
+										if boolInOrNot == 0:
+											if intNeOrPoHigh<0:
+												AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointInter, ltTmpPointNum, 2)
+											else:
+												AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointInter, ltTmpPointNum, 3)
+											quePoint.put(ptcordTmpPointInter)
+									else:
+										print "Impossible"
+										continue
 						else:
 							print "Impossible"
 							continue
-					rs.DeleteObject(cvInterCircle)
 
 	return 0
 
