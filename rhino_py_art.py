@@ -5,6 +5,9 @@ import Rhino
 import math
 import Queue
 
+BOOLFORWHATISNOW = 1
+BOOLFORSURFACE = 0
+
 strPathExamine = "order.txt"
 strPathOut = "result.txt"
 fileTmp0 = open(strPathExamine,'w')
@@ -14,35 +17,46 @@ fileTmp1.close()
 dictPointByNum = {} #all the points,(0,0) is the start point
 dictPointByCord = {}
 dictPointByCordGetRs = {}
+dictPointByRealCord = {}
 cvBaseCurve = None
 sfBaseSurface = None
-reRadius = 1500 #the length of the equal side
-reBase = 1000 #the length of the bottom side
-reDist = 700
-'''
-reRadius = 5 #the length of the equal side
-reBase = 5 #the length of the bottom side
-reDist = 0.5
-'''
+if BOOLFORWHATISNOW is 0:
+	reRadius = 1500 #the length of the equal side
+	reBase = 1000 #the length of the bottom side
+	reDist = 700
+	intInterval = 20
+	intHashSize = 500
+else:
+	reRadius = 5 #the length of the equal side
+	reBase = 5 #the length of the bottom side
+	reDist = 0.5
+	intInterval = 5
+	intHashSize = 0.8
 intMaxX = 0
+intTestNum =5
 intMaxY = 0
 intPointNum = 0
 ltObjectPoint = []
-intTestNum =20
-intInterval = 20
+
+def GetHash(ptcordPoint):
+	return (int(ptcordPoint[0]/intHashSize),int(ptcordPoint[1]/intHashSize),int(ptcordPoint[2]/intHashSize))
 
 def InOrOut(ptcordTmpPointInter, ltTmpPointCord, intMaxDist=0): #to judge whether I have added this point
+	global dictPointByRealCord
 	ltDeltaX = range(-intTestNum,intTestNum+1)
 	ltDeltaY = range(-intTestNum,intTestNum+1)
+	ltDeltaZ = range(-intTestNum,intTestNum+1)
+	ltHashCode = GetHash(ptcordTmpPointInter)
 	for intDeltaX in ltDeltaX:
 		for intDeltaY in ltDeltaY:
-			ltTmpPointCordNear = (ltTmpPointCord[0]+intDeltaX, ltTmpPointCord[1]+intDeltaY)
-			if ltTmpPointCordNear not in dictPointByNum:
-				continue
-			ptcordPointTmpInOrOut = dictPointByNum[ltTmpPointCordNear]
-			reDistForCompare = rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPointInter)
-			if reDistForCompare < reDist+intMaxDist*reBase:
-				return 1
+			for intDeltaZ in ltDeltaZ:
+				ltTmpPointCordNear = (ltHashCode[0]+intDeltaX, ltHashCode[1]+intDeltaY, ltHashCode[2]+intDeltaZ)
+				if ltTmpPointCordNear not in dictPointByRealCord:
+					continue
+				ptcordPointTmpInOrOut = dictPointByRealCord[ltTmpPointCordNear]
+				reDistForCompare = rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPointInter)
+				if reDistForCompare < reDist+intMaxDist*reBase:
+					return 1
 	return 0
 
 def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ptcordThirdPoint, ltTmpCordNum, intWhich): #to add the point into the dict
@@ -50,6 +64,7 @@ def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ptcordThirdPoint, ltTmpCordNum
 	global intMaxY
 	global sfBaseSurface
 	global intPointNum
+	global dictPointByRealCord
 	ptTmpPoint = rs.AddPoint(ptcordTmpPointInter)
 	ltObjectPoint.append(ptTmpPoint)
 	if not rs.IsPointOnSurface(sfBaseSurface,ptTmpPoint):
@@ -82,8 +97,9 @@ def AddPoint(ptcordTmpPointInter, ptcordTmpPoint, ptcordThirdPoint, ltTmpCordNum
 	dictPointByCord[ptcordTmpPointInter] = ltTmpCordNumInter
 	dictPointByCordGetRs[ptcordTmpPointInter] = ptTmpPoint
 	dictPointByNum[tuple(ltTmpCordNumInter)] = ptcordTmpPointInter
-#	if ptcordThirdPoint is not None:
-#		rs.AddSrfPt([ptTmpPoint,dictPointByCordGetRs[ptcordTmpPoint],dictPointByCordGetRs[ptcordThirdPoint]])
+	dictPointByRealCord[GetHash(ptcordTmpPointInter)] = ptcordTmpPointInter
+	if (ptcordThirdPoint is not None) and (BOOLFORSURFACE==1):
+		rs.AddSrfPt([ptTmpPoint,dictPointByCordGetRs[ptcordTmpPoint],dictPointByCordGetRs[ptcordThirdPoint]])
 	intPointNum += 1
 	if intPointNum%20==0:
 		fileTmp0 = open(strPathExamine,'r')
@@ -108,6 +124,7 @@ def continue_or_not():
 def init():
 	global dictPointByNum #all the global vars
 	global dictPointByCord
+	global dictPointByRealCord
 	global cvBaseCurve
 	global sfBaseSurface
 	global reRadius
@@ -127,6 +144,13 @@ def init():
 	dictPointByNum[(0,0)] = ptcordStartPoint
 	dictPointByCord[ptcordStartPoint] = (0,0)
 	dictPointByCordGetRs[ptcordStartPoint] = ptStartPoint
+	dictPointByRealCord[GetHash(ptcordStartPoint)] = ptcordStartPoint
+
+	print ptcordStartPoint
+	print ptcordStartPoint[0]
+	print ptcordStartPoint[1]
+	print ptcordStartPoint[2]
+	print GetHash(ptcordStartPoint)
 
 	while quePoint.qsize()>0:
 		'''
@@ -170,6 +194,7 @@ def finish():
 def expand(intStartY): #this function expands the points in the Y direction
 	global dictPointByNum #all the global vars
 	global dictPointByCord
+	global dictPointByRealCord
 	global cvBaseCurve
 	global sfBaseSurface
 	global reRadius
