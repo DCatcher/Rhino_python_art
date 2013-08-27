@@ -5,8 +5,8 @@ import Rhino
 import math
 import Queue
 
-BOOLFORWHATISNOW = 1
-BOOLFORSURFACE = 0
+BOOLFORWHATISNOW = 0
+BOOLFORSURFACE = 1
 
 strPathExamine = "order.txt"
 strPathOut = "result.txt"
@@ -26,14 +26,16 @@ if BOOLFORWHATISNOW is 0:
 	reDist = 700
 	intInterval = 20
 	intHashSize = 500
+	intDistValue = 0.2
 else:
 	reRadius = 5 #the length of the equal side
 	reBase = 5 #the length of the bottom side
 	reDist = 0.5
 	intInterval = 5
 	intHashSize = 0.8
+	intDistValue = 0.6
 intMaxX = 0
-intTestNum =5
+intTestNum =4
 intMaxY = 0
 intPointNum = 0
 ltObjectPoint = []
@@ -41,7 +43,7 @@ ltObjectPoint = []
 def GetHash(ptcordPoint):
 	return (int(ptcordPoint[0]/intHashSize),int(ptcordPoint[1]/intHashSize),int(ptcordPoint[2]/intHashSize))
 
-def InOrOut(ptcordTmpPointInter, ltTmpPointCord, intMaxDist=0): #to judge whether I have added this point
+def InOrOut(ptcordTmpPointInter, ptcordTmpPoint0, ptcordTmpPoint1, ltTmpPointCord, intMaxDist=0): #to judge whether I have added this point
 	global dictPointByRealCord
 	ltDeltaX = range(-intTestNum,intTestNum+1)
 	ltDeltaY = range(-intTestNum,intTestNum+1)
@@ -54,6 +56,12 @@ def InOrOut(ptcordTmpPointInter, ltTmpPointCord, intMaxDist=0): #to judge whethe
 				if ltTmpPointCordNear not in dictPointByRealCord:
 					continue
 				ptcordPointTmpInOrOut = dictPointByRealCord[ltTmpPointCordNear]
+				'''
+				if (ptcordTmpPoint0 is not None) and (rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPoint0)<intHashSize):
+					continue
+				if (ptcordTmpPoint1 is not None) and (rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPoint1)<intHashSize):
+					continue
+				'''
 				reDistForCompare = rs.Distance(ptcordPointTmpInOrOut,ptcordTmpPointInter)
 				if reDistForCompare < reDist+intMaxDist*reBase:
 					return 1
@@ -172,7 +180,7 @@ def init():
 		for ltIntersectionPoint in ltTmpIntersection:
 			if ltIntersectionPoint[0]==1:
 				ptcordTmpPointInter = ltIntersectionPoint[1]
-				boolInOrNot = InOrOut(ptcordTmpPointInter, ltTmpCordNum)
+				boolInOrNot = InOrOut(ptcordTmpPointInter,ptcordTmpPoint, None, ltTmpCordNum)
 				if boolInOrNot == 0:
 					quePoint.put(ptcordTmpPointInter)
 					AddPoint(ptcordTmpPointInter, ptcordTmpPoint, None, ltTmpCordNum, 0)
@@ -249,7 +257,7 @@ def expand(intStartY): #this function expands the points in the Y direction
 			for ltIntersectionPoint in ltTmpIntersection: #Add the points
 				if ltIntersectionPoint[0]==1:
 					ptcordTmpPointInter = ltIntersectionPoint[1]
-					boolInOrNot = InOrOut(ptcordTmpPointInter, ltTmpPointNearNum)
+					boolInOrNot = InOrOut(ptcordTmpPointInter,ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNearNum)
 					if boolInOrNot == 0:
 						if intNeOrPo<0:
 							AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNearNum, 1)
@@ -263,9 +271,13 @@ def expand(intStartY): #this function expands the points in the Y direction
 		for intNeOrPoHigh in ltNeAndPoHigh:
 			if (ltTmpPointNum[0]+intNeOrPoHigh,ltTmpPointNum[1]) not in dictPointByNum:
 				for intNeOrPo in ltNeAndPo:
-					if intNeOrPoHigh==1:
+					if (intNeOrPoHigh==1) and (intNeOrPo==1):
 						ltTmpPointNearNum = (ltTmpPointNum[0]-intNeOrPoHigh,ltTmpPointNum[1]+intNeOrPo)
-					else:
+					elif (intNeOrPoHigh==-1) and (intNeOrPo==1):
+						ltTmpPointNearNum = (ltTmpPointNum[0],ltTmpPointNum[1]+intNeOrPo)
+					elif (intNeOrPoHigh==-1) and (intNeOrPo==-1):
+						ltTmpPointNearNum = (ltTmpPointNum[0]-intNeOrPoHigh,ltTmpPointNum[1]+intNeOrPo)
+					elif (intNeOrPoHigh==1) and (intNeOrPo==-1):
 						ltTmpPointNearNum = (ltTmpPointNum[0],ltTmpPointNum[1]+intNeOrPo)
 
 					if ltTmpPointNearNum not in dictPointByNum:
@@ -288,7 +300,7 @@ def expand(intStartY): #this function expands the points in the Y direction
 					for ltIntersectionPoint in ltTmpIntersection: #Add the points
 						if ltIntersectionPoint[0]==1:
 							ptcordTmpPointInter = ltIntersectionPoint[1]
-							boolInOrNot = InOrOut(ptcordTmpPointInter,ltTmpPointNearNum, 0.6)
+							boolInOrNot = InOrOut(ptcordTmpPointInter,ptcordTmpPoint,ptcordTmpPointNear,ltTmpPointNearNum, intDistValue)
 							if boolInOrNot == 0:
 								if intNeOrPoHigh<0:
 									AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointNear, ltTmpPointNearNum, 2)
@@ -311,7 +323,7 @@ def expand(intStartY): #this function expands the points in the Y direction
 								for ltIntersectionPoint in ltTmpIntersection: #Add the points
 									if ltIntersectionPoint[0]==1:
 										ptcordTmpPointInter = ltIntersectionPoint[1]
-										boolInOrNot = InOrOut(ptcordTmpPointInter, ltTmpPointNum, 0.6)
+										boolInOrNot = InOrOut(ptcordTmpPointInter,ptcordTmpPoint,ptcordTmpPointInter, ltTmpPointNum, intDistValue)
 										if boolInOrNot == 0:
 											if intNeOrPoHigh<0:
 												AddPoint(ptcordTmpPointInter, ptcordTmpPoint,ptcordTmpPointInter, ltTmpPointNum, 2)
